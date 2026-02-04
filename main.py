@@ -11,8 +11,21 @@ from routers.auth import auth_router
 load_dotenv()
 
 app = FastAPI(
-    title="Horizon Backend",
-    description="Backend API for Horizon 2026, hosted by AWS Cloud Club at LPU",
+    title="Core Platform API",
+    description="""
+    Core Platform API is the centralized backend service that powers all current and future applications,
+    websites and internal tools.
+
+    It provides:
+    - Authentication and authorization (JWT + Refresh Token)
+    - Role-based access control (Attendee, Manager, Core)
+    - User identity and profile management
+    - Secure, reusable APIs shared accorss multiple platforms
+
+    This API is designed to be stable, extensible and serve as the single source of truth for all platform services going forward.
+    
+    Goal: To reduce duplication, improve security and provide a consistent backend foundation for all products of AWS Cloud Club LPU.
+    """,
     version="1.0.0"
 )
 
