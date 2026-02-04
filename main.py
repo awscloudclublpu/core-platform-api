@@ -32,7 +32,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://horizon.awslpu.in"],
+    allow_origins=["http://localhost:3000", "http://localhost:8000", "https://horizon.awslpu.in"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
