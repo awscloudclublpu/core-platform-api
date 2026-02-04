@@ -19,3 +19,5 @@ class UserBase(BaseModel):
 
     hostel: Optional[str] = None
     profile_picture_url: Optional[str] = None
+
+    email_verified: bool = False

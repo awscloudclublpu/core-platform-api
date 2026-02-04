@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 import uvicorn
 from contextlib import asynccontextmanager
-
 from dotenv import load_dotenv
 
 from db.mongo import get_mongo_client
 from db.indexes import create_indexes
+
+from routers.auth import auth_router
 
 load_dotenv()
 
@@ -14,6 +15,12 @@ app = FastAPI(
     description="Backend API for Horizon 2026, hosted by AWS Cloud Club at LPU",
     version="1.0.0"
 )
+
+registered_routers = [
+    auth_router
+]
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
