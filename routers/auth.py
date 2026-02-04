@@ -70,18 +70,19 @@ async def register_user(payload: UserRegisterRequest):
 # -------------------------------------------------------------------
 # LOGIN
 # -------------------------------------------------------------------
+from models.user.requests import UserLoginRequest
+
 @auth_router.post("/login", response_model=TokenResponse)
 async def login_user(
+    payload: UserLoginRequest,
     response: Response,
-    email: str,
-    password: str,
 ):
     users = users_collection()
     refresh_tokens = refresh_tokens_collection()
 
     user = await users.find_one(
         {
-            "email": email
+            "email": payload.email
         }
     )
     if not user:
@@ -91,7 +92,7 @@ async def login_user(
         )
 
     if not bcrypt.checkpw(
-        password.encode(),
+        payload.password.encode(),
         user['password_hash'].encode()
     ):
         raise HTTPException(

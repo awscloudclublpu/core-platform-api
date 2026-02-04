@@ -20,7 +20,8 @@ registered_routers = [
     auth_router
 ]
 
-
+for router in registered_routers:
+     app.include_router(router)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

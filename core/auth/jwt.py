@@ -1,3 +1,7 @@
+
+from dotenv import load_dotenv
+load_dotenv()
+
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 import os
