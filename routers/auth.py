@@ -15,7 +15,7 @@ from core.auth.jwt import create_access_token
 
 auth_router = APIRouter(
     prefix="/auth",
-    tags=["auth"],
+    tags=["Authentication"],
 )
 
 # -------------------------------------------------------------------
@@ -32,7 +32,18 @@ ASIA_KOLKATA = pytz.timezone("Asia/Kolkata")
 # -------------------------------------------------------------------
 # REGISTER
 # -------------------------------------------------------------------
-@auth_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@auth_router.post("/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    description="""
+    ### Register Flow
+    Register a new user with email and password.
+    Returns the created user details (excluding password).
+    Validations:
+    - Email must be unique.
+    - Password is hashed before storage.
+    """,
+)
 async def register_user(payload: UserRegisterRequest):
     users = users_collection()
 
@@ -72,7 +83,17 @@ async def register_user(payload: UserRegisterRequest):
 # -------------------------------------------------------------------
 from models.user.requests import UserLoginRequest
 
-@auth_router.post("/login", response_model=TokenResponse)
+@auth_router.post(
+    "/login",
+    response_model=TokenResponse,
+    description="""
+    ### Login Flow
+    Authenticate user with email and password.
+    Returns an access token (JWT) and sets a refresh token as an HTTP-only cookie.
+    Validations:
+    - Validates email and password.
+    """,
+)
 async def login_user(
     payload: UserLoginRequest,
     response: Response,

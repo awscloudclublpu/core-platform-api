@@ -11,6 +11,13 @@ from routers.auth import auth_router
 
 load_dotenv()
 
+openAPI_tags = [
+    {
+        "name": "Authentication",
+        "description": "Endpoints related to user authentication and authorization.",
+    }
+]
+
 app = FastAPI(
     title="Core Platform API",
     description="""
@@ -27,7 +34,9 @@ app = FastAPI(
     
     Goal: To reduce duplication, improve security and provide a consistent backend foundation for all products of AWS Cloud Club LPU.
     """,
-    version="1.0.0"
+    version="1.0.0",
+    redoc_url="/docs/v2",
+    openapi_tags=openAPI_tags,
 )
 
 app.add_middleware(
