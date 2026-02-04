@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
@@ -27,6 +28,14 @@ app = FastAPI(
     Goal: To reduce duplication, improve security and provide a consistent backend foundation for all products of AWS Cloud Club LPU.
     """,
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://horizon.awslpu.in"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 registered_routers = [
