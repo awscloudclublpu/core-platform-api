@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Response
+from fastapi import APIRouter, HTTPException, status, Response, Cookie
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 import bcrypt
@@ -156,3 +156,128 @@ async def login_user(
         expires_in=5 * 60,
         email_verified=user.get("email_verified", False),
     )
+
+# -------------------------------------------------------------------
+# REFRESH TOKEN
+# -------------------------------------------------------------------
+
+@auth_router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    description="""
+    ### Refresh Token Flow
+    Issues a new access token using a valid refresh token.
+    - Refresh token must be present in HTTP-only cookie.
+    - Refresh token is rotated on every use.
+    """,
+)
+async def refresh_access_token(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+):
+    if refresh_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+        )
+
+    refresh_tokens = refresh_tokens_collection()
+    users = users_collection()
+
+    refresh_token_hash = hash_refresh_token(refresh_token)
+
+    stored_token = await refresh_tokens.find_one(
+        {
+            "token_hash": refresh_token_hash,
+            "revoked": False,
+            "expires_at": {"$gt": datetime.now(ASIA_KOLKATA)},
+        }
+    )
+
+    if not stored_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    user = await users.find_one({"id": stored_token["user_id"]})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    # ---------- ROTATE REFRESH TOKEN ----------
+    await refresh_tokens.update_one(
+        {"token_hash": refresh_token_hash},
+        {"$set": {"revoked": True}}
+    )
+
+    new_refresh_token = secrets.token_urlsafe(64)
+    new_refresh_token_hash = hash_refresh_token(new_refresh_token)
+
+    await refresh_tokens.insert_one(
+        {
+            "token_hash": new_refresh_token_hash,
+            "user_id": user["id"],
+            "expires_at": datetime.now(ASIA_KOLKATA)
+            + timedelta(days=REFRESH_TOKEN_TLL_DAYS),
+            "revoked": False,
+            "created_at": datetime.now(ASIA_KOLKATA),
+        }
+    )
+
+    # ---------- NEW ACCESS TOKEN ----------
+    access_token = create_access_token(
+        user_id=user["id"],
+        role=UserRole(user["role"]),
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=REFRESH_TOKEN_TLL_DAYS * 24 * 60 * 60,
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=5 * 60,
+        email_verified=user.get("email_verified", False),
+    )
+
+# -------------------------------------------------------------------
+# LOGOUT
+# -------------------------------------------------------------------
+
+@auth_router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    description="""
+    ### Logout Flow
+    Revokes the refresh token and clears authentication cookies.
+    """,
+)
+async def logout_user(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+):
+    if refresh_token:
+        refresh_tokens = refresh_tokens_collection()
+        refresh_token_hash = hash_refresh_token(refresh_token)
+
+        await refresh_tokens.update_one(
+            {"token_hash": refresh_token_hash},
+            {"$set": {"revoked": True}}
+        )
+
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
+
+    return None

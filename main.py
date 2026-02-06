@@ -8,6 +8,7 @@ from db.mongo import get_mongo_client
 from db.indexes import create_indexes
 
 from routers.auth import auth_router
+from routers.event import event_router
 
 load_dotenv()
 
@@ -15,6 +16,10 @@ openAPI_tags = [
     {
         "name": "Authentication",
         "description": "Endpoints related to user authentication and authorization.",
+    },
+    {
+        "name": "Events",
+        "description": "Endpoints related to event management and operations.",
     }
 ]
 
@@ -48,7 +53,8 @@ app.add_middleware(
 )
 
 registered_routers = [
-    auth_router
+    auth_router,
+    event_router,
 ]
 
 for router in registered_routers:
