@@ -10,3 +10,6 @@ def refresh_tokens_collection() -> AsyncCollection:
 
 def event_collection() -> AsyncCollection:
     return get_database()["events"]
+
+def registration_collection() -> AsyncCollection:
+    return get_database()["registrations"]

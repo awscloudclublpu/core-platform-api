@@ -9,17 +9,26 @@ from db.indexes import create_indexes
 
 from routers.auth import auth_router
 from routers.event import event_router
+from routers.registrations import registrations_router
 
 load_dotenv()
 
 openAPI_tags = [
     {
         "name": "Authentication",
-        "description": "Endpoints related to user authentication and authorization.",
+        "description": "User authentication and authorization."
     },
     {
         "name": "Events",
-        "description": "Endpoints related to event management and operations.",
+        "description": "Event creation, updates, and metadata."
+    },
+    {
+        "name": "Registrations",
+        "description": "User registrations and participation in events."
+    },
+    {
+        "name": "Attendance",
+        "description": "Attendance tracking and event participation analytics."
     }
 ]
 
@@ -55,6 +64,7 @@ app.add_middleware(
 registered_routers = [
     auth_router,
     event_router,
+    registrations_router,
 ]
 
 for router in registered_routers:
@@ -70,4 +80,4 @@ async def lifespan(app: FastAPI):
     await client.close()
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)

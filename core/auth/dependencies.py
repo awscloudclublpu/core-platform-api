@@ -15,13 +15,15 @@ def require_role(*allowed_roles: UserRole):
     """
 
     def checker(
-        payload: JWTPayload = Depends(get_current_user),
-    ) -> JWTPayload:
-        if payload.role not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions",
-            )
-        return payload
+            payload: JWTPayload = Depends(get_current_user),
+        ) -> JWTPayload:
+
+            if allowed_roles and payload.role not in allowed_roles:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions",
+                )
+
+            return payload
 
     return checker
