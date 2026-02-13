@@ -54,6 +54,13 @@ async def register_user(payload: UserRegisterRequest):
             detail="Email already registered",
         )
     
+    existing_university_id = await users.find_one({"university_uid": payload.university_uid})
+    if existing_university_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="University ID already registered",
+        )
+    
     password_hash = bcrypt.hashpw(
         payload.password.encode(),
         bcrypt.gensalt(),
@@ -62,20 +69,23 @@ async def register_user(payload: UserRegisterRequest):
     now = datetime.now(ASIA_KOLKATA)
 
     user = UserDB(
+        id=str(uuid4()),
         **payload.model_dump(exclude={"password"}),
-        role=UserRole.attendee,
         password_hash=password_hash,
         is_verified=False,
         created_at=now,
         updated_at=now,
     )
 
-    await users.insert_one(user.model_dump())
+    # Store with _id for MongoDB
+    user_dict = user.model_dump()
+    user_dict["_id"] = user_dict["id"]
+    del user_dict["id"]
+    await users.insert_one(user_dict)
 
+    # Return response with id
     return UserResponse(
-        **user.model_dump(
-            exclude={"password_hash"}
-        )
+        **user.model_dump(exclude={"password_hash"})
     )
 
 # -------------------------------------------------------------------
@@ -123,7 +133,7 @@ async def login_user(
     
     # ---------- JWT ----------
     access_token = create_access_token(
-        user_id=user["id"],
+        user_id=user["_id"],
         role=UserRole(user["role"]),
     )
 
@@ -134,7 +144,7 @@ async def login_user(
     await refresh_tokens.insert_one(
         {
             "token_hash": refresh_token_hash,
-            "user_id": user["id"],
+            "user_id": user["_id"],
             "expires_at": datetime.now(ASIA_KOLKATA) + timedelta(days=REFRESH_TOKEN_TLL_DAYS),
             "revoked": False,
             "created_at": datetime.now(ASIA_KOLKATA),

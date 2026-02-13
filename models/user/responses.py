@@ -3,6 +3,6 @@ from pydantic import Field
 from .base import UserBase
 
 class UserResponse(UserBase):
-    id: str = Field(alias="_id")
+    id: str
     is_verified: bool
     created_at: datetime
