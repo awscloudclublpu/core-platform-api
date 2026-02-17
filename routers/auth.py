@@ -47,6 +47,12 @@ ASIA_KOLKATA = pytz.timezone("Asia/Kolkata")
 async def register_user(payload: UserRegisterRequest):
     users = users_collection()
 
+    if payload.role != "attendee":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role",
+        )
+
     existing = await users.find_one({"email": payload.email})
     if existing:
         raise HTTPException(
