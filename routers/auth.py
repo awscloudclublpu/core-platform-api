@@ -1,17 +1,21 @@
-from fastapi import APIRouter, HTTPException, status, Response, Cookie
-from datetime import datetime, timedelta, timezone
-from uuid import uuid4
-import bcrypt
+import os
 import secrets
-import hashlib
-import pytz
+from datetime import datetime, timedelta
+from uuid import uuid4
 
-from models.user import UserRegisterRequest, UserResponse, UserDB
+import bcrypt
+import pytz
+from dotenv import load_dotenv
+from fastapi import APIRouter, Cookie, Header, HTTPException, Response, status
+
+from core.auth.jwt import create_access_token
+from db.collections import refresh_tokens_collection, users_collection
 from models.auth.responses import TokenResponse
+from models.auth.utils import hash_refresh_token, rotate_refresh_token, validate_refresh_session
+from models.user import UserDB, UserRegisterRequest, UserResponse
 from models.user.enums import UserRole
 
-from db.collections import users_collection, refresh_tokens_collection
-from core.auth.jwt import create_access_token
+load_dotenv()
 
 auth_router = APIRouter(
     prefix="/auth",
@@ -22,10 +26,7 @@ auth_router = APIRouter(
 # HELPERS
 # -------------------------------------------------------------------
 
-REFRESH_TOKEN_TLL_DAYS = 30
-
-def hash_refresh_token(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
+REFRESH_TOKEN_TLL_DAYS = int(os.getenv("REFRESH_TOKEN_TLL_DAYS", 30))
 
 ASIA_KOLKATA = pytz.timezone("Asia/Kolkata")
 
@@ -147,11 +148,16 @@ async def login_user(
     refresh_token = secrets.token_urlsafe(64)
     refresh_token_hash = hash_refresh_token(refresh_token)
 
+    device_id = payload.device_id or str(uuid4())
+
     await refresh_tokens.insert_one(
         {
             "token_hash": refresh_token_hash,
             "user_id": user["_id"],
-            "expires_at": datetime.now(ASIA_KOLKATA) + timedelta(days=REFRESH_TOKEN_TLL_DAYS),
+            "role": user["role"],
+            "device_id": device_id,
+            "expires_at": datetime.now(ASIA_KOLKATA)
+                + timedelta(days=REFRESH_TOKEN_TLL_DAYS),
             "revoked": False,
             "created_at": datetime.now(ASIA_KOLKATA),
         }
@@ -190,63 +196,24 @@ async def login_user(
 async def refresh_access_token(
     response: Response,
     refresh_token: str | None = Cookie(default=None),
+    device_id: str | None = Header(default=None, alias="X-DEVICE-ID"),
 ):
-    if refresh_token is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token missing",
-        )
+    if not refresh_token:
+        raise HTTPException(401, "Refresh token missing")
 
-    refresh_tokens = refresh_tokens_collection()
-    users = users_collection()
-
-    refresh_token_hash = hash_refresh_token(refresh_token)
-
-    stored_token = await refresh_tokens.find_one(
-        {
-            "token_hash": refresh_token_hash,
-            "revoked": False,
-            "expires_at": {"$gt": datetime.now(ASIA_KOLKATA)},
-        }
+    stored_token, token_hash = await validate_refresh_session(
+        refresh_token,
+        device_id,
     )
 
-    if not stored_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
-        )
-
-    user = await users.find_one({"id": stored_token["user_id"]})
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-
-    # ---------- ROTATE REFRESH TOKEN ----------
-    await refresh_tokens.update_one(
-        {"token_hash": refresh_token_hash},
-        {"$set": {"revoked": True}}
+    new_refresh_token = await rotate_refresh_token(
+        token_hash,
+        stored_token,
     )
 
-    new_refresh_token = secrets.token_urlsafe(64)
-    new_refresh_token_hash = hash_refresh_token(new_refresh_token)
-
-    await refresh_tokens.insert_one(
-        {
-            "token_hash": new_refresh_token_hash,
-            "user_id": user["id"],
-            "expires_at": datetime.now(ASIA_KOLKATA)
-            + timedelta(days=REFRESH_TOKEN_TLL_DAYS),
-            "revoked": False,
-            "created_at": datetime.now(ASIA_KOLKATA),
-        }
-    )
-
-    # ---------- NEW ACCESS TOKEN ----------
     access_token = create_access_token(
-        user_id=user["id"],
-        role=UserRole(user["role"]),
+        user_id=stored_token["user_id"],
+        role=UserRole(stored_token["role"]),
     )
 
     response.set_cookie(
@@ -261,9 +228,8 @@ async def refresh_access_token(
     return TokenResponse(
         access_token=access_token,
         expires_in=5 * 60,
-        email_verified=user.get("email_verified", False),
+        email_verified=True,  # optional cached field
     )
-
 # -------------------------------------------------------------------
 # LOGOUT
 # -------------------------------------------------------------------
