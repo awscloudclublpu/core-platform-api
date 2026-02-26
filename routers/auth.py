@@ -115,6 +115,17 @@ async def register_user(payload: UserRegisterRequest):
     Validations:
     - Validates email and password.
     """,
+    responses={
+        200: {
+            "description": "Sets refresh token cookie",
+            "headers": {
+                "Set-Cookie": {
+                    "description": "Refresh token (HttpOnly cookie)",
+                    "schema": {"type": "string"}
+                }
+            }
+        }
+    },
 )
 @audit_log(action="USER_LOGIN")
 async def login_user(
