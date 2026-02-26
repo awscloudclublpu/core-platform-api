@@ -50,7 +50,7 @@ async def create_event(
     )
 
 @event_router.put(
-    "/{event_id}",
+    "/{id}",
     response_model=EventDetails,
 )
 async def update_event(
@@ -101,7 +101,7 @@ async def list_events():
     return result
 
 @event_router.get(
-    "/{event_id}",
+    "/{id}",
     response_model=EventDetails,
 )
 async def get_event_details(event_id: str):
