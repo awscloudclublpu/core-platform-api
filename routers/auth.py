@@ -6,14 +6,18 @@ from uuid import uuid4
 import bcrypt
 import pytz
 from dotenv import load_dotenv
-from fastapi import APIRouter, Cookie, Header, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Header, HTTPException, Response, status, Request
 
 from core.auth.jwt import create_access_token
 from db.collections import refresh_tokens_collection, users_collection
 from models.auth.responses import TokenResponse
 from models.auth.utils import hash_refresh_token, rotate_refresh_token, validate_refresh_session
-from models.user import UserDB, UserRegisterRequest, UserResponse
-from models.user.enums import UserRole
+from models.auth.requests import LoginRequest, UserRegisterRequest
+from models.user import UserDB, UserResponse
+from models.auth.enums import UserRole
+from core.logging.audit import audit_log
+from core.logging.logger import Logger
+from core.security.device import is_new_device
 
 load_dotenv()
 
@@ -45,6 +49,7 @@ ASIA_KOLKATA = pytz.timezone("Asia/Kolkata")
     - Password is hashed before storage.
     """,
 )
+@audit_log(action="USER_REGISTER")
 async def register_user(payload: UserRegisterRequest):
     users = users_collection()
 
@@ -82,6 +87,7 @@ async def register_user(payload: UserRegisterRequest):
         is_verified=False,
         created_at=now,
         updated_at=now,
+        device_id=payload.device_id,
     )
 
     # Store with _id for MongoDB
@@ -98,7 +104,6 @@ async def register_user(payload: UserRegisterRequest):
 # -------------------------------------------------------------------
 # LOGIN
 # -------------------------------------------------------------------
-from models.user.requests import UserLoginRequest
 
 @auth_router.post(
     "/login",
@@ -111,8 +116,10 @@ from models.user.requests import UserLoginRequest
     - Validates email and password.
     """,
 )
+@audit_log(action="USER_LOGIN")
 async def login_user(
-    payload: UserLoginRequest,
+    request: Request,
+    payload: LoginRequest,
     response: Response,
 ):
     users = users_collection()
@@ -138,7 +145,21 @@ async def login_user(
             detail="Invalid credentials",
         )
     
-    # ---------- JWT ----------
+    device_id = payload.device_id or str(uuid4())
+
+    new_device = await is_new_device(
+        refresh_tokens=refresh_tokens,
+        user_id=user["_id"],
+        device_id=device_id,
+    )
+
+    if new_device:
+        await Logger.new_device(
+            request=request,
+            user_id=user["_id"],
+            device_id=device_id,
+        )
+
     access_token = create_access_token(
         user_id=user["_id"],
         role=UserRole(user["role"]),
@@ -147,8 +168,6 @@ async def login_user(
     # ---------- REFRESH TOKEN ----------
     refresh_token = secrets.token_urlsafe(64)
     refresh_token_hash = hash_refresh_token(refresh_token)
-
-    device_id = payload.device_id or str(uuid4())
 
     await refresh_tokens.insert_one(
         {

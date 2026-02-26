@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from db.collections import event_collection
 from core.auth.dependencies import require_role
-from models.user.enums import UserRole
+from models.auth.enums import UserRole
 from models.auth.jwt import JWTPayload
 
 from models.event import (

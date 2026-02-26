@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 
 from models.auth.jwt import JWTPayload
-from models.user.enums import UserRole
+from models.auth.enums import UserRole
 
 # -------------------------------------------------------------------
 # Config (read once)

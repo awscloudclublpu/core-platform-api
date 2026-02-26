@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, status
 
 from core.auth.jwt import get_current_user
 from models.auth.jwt import JWTPayload
-from models.user.enums import UserRole
+from models.auth.enums import UserRole
 
 
 def require_role(*allowed_roles: UserRole):

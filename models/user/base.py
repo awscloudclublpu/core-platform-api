@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
-from .enums import UserRole
+from models.auth.enums import UserRole
 
 class UserBase(BaseModel):
     first_name: str = Field(min_length=1, max_length=50)

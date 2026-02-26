@@ -6,7 +6,7 @@ from bson import ObjectId
 
 from db.collections import registration_collection
 from core.auth.dependencies import require_role
-from models.user.enums import UserRole
+from models.auth.enums import UserRole
 from models.auth.jwt import JWTPayload
 
 from models.registrations import (

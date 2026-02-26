@@ -1,7 +1,12 @@
-# models/user/enums.py
-from enum import Enum
+import warnings
+from models.auth.enums import UserRole as _UserRole
 
-class UserRole(str, Enum):
-    attendee = "attendee"
-    manager = "manager"
-    core = "core"
+warnings.warn(
+    "Importing `models.user.enums.UserRole` is deprecated — use `models.auth.enums.UserRole` instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+UserRole = _UserRole
+
+__all__ = ["UserRole"]

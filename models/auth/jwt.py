@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from models.user.enums import UserRole
+from models.auth.enums import UserRole
 
 class JWTPayload(BaseModel):
     sub: str
