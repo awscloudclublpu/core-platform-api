@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
@@ -32,7 +32,8 @@ class QuestionSchema(BaseModel):
         description="Optional explanation shown after submission"
     )
 
-    @validator("options")
+    @field_validator("options")
+    @classmethod
     def validate_options(cls, value):
         if len(value) < 2:
             raise ValueError("A question must have at least 2 options")
@@ -85,7 +86,8 @@ class QuizSchedule(BaseModel):
         description="Quiz closes at this time"
     )
 
-    @validator("end_time")
+    @field_validator("end_time")
+    @classmethod
     def validate_time_window(cls, end_time, values):
         start_time = values.get("start_time")
         if start_time and end_time <= start_time:
@@ -93,9 +95,6 @@ class QuizSchedule(BaseModel):
         return end_time
 
 
-# ----------------------------
-# Main Quiz Create Schema
-# ----------------------------
 
 class QuizCreateRequest(BaseModel):
     title: str = Field(

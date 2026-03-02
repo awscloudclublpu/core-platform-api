@@ -12,12 +12,13 @@ from core.auth.jwt import create_access_token
 from db.collections import refresh_tokens_collection, users_collection
 from models.auth.responses import TokenResponse
 from models.auth.utils import hash_refresh_token, rotate_refresh_token, validate_refresh_session
-from models.auth.requests import LoginRequest, UserRegisterRequest
+from models.auth.requests import LoginRequest, UserRegisterRequest, GoogleLoginRequest
 from models.user import UserDB, UserResponse
 from models.auth.enums import UserRole
 from core.logging.audit import audit_log
 from core.logging.logger import Logger
 from core.security.device import is_new_device
+from firebase_admin import auth as firebase_auth
 
 load_dotenv()
 
@@ -96,7 +97,6 @@ async def register_user(payload: UserRegisterRequest):
     del user_dict["id"]
     await users.insert_one(user_dict)
 
-    # Return response with id
     return UserResponse(
         **user.model_dump(exclude={"password_hash"})
     )
@@ -208,6 +208,117 @@ async def login_user(
         expires_in=5 * 60,
         email_verified=user.get("email_verified", False),
     )
+
+@auth_router.post(
+    "/google-login",
+    response_model=TokenResponse,
+    description="""
+    ### Google Login Flow
+    Authenticate user with Google ID token.
+    Verifies existing account email if not verified else proceeds with login.
+    """,
+)
+@audit_log(action="GOOGLE_LOGIN")
+async def google_login(
+    request: Request,
+    payload: GoogleLoginRequest,
+    response: Response,
+):
+    users = users_collection()
+    refresh_tokens = refresh_tokens_collection()
+
+    try:
+        decoded_token = firebase_auth.verify_id_token(
+            payload.id_token
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google token",
+        )
+
+    email = decoded_token.get("email")
+    email_verified = decoded_token.get("email_verified", False)
+    google_uid = decoded_token.get("uid")
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email not provided by Google",
+        )
+
+    if not email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Google email not verified",
+        )
+
+    user = await users.find_one({"email": email})
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account not registered",
+        )
+
+    if not user.get("email_verified"):
+        await users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"email_verified": True}}
+        )
+
+    device_id = payload.device_id or str(uuid4())
+
+    new_device = await is_new_device(
+        refresh_tokens=refresh_tokens,
+        user_id=user["_id"],
+        device_id=device_id,
+    )
+
+    if new_device:
+        await Logger.new_device(
+            request=request,
+            user_id=user["_id"],
+            device_id=device_id,
+        )
+
+    access_token = create_access_token(
+        user_id=user["_id"],
+        role=UserRole(user["role"]),
+    )
+
+    refresh_token = secrets.token_urlsafe(64)
+    refresh_token_hash = hash_refresh_token(refresh_token)
+
+    await refresh_tokens.insert_one(
+        {
+            "token_hash": refresh_token_hash,
+            "user_id": user["_id"],
+            "role": user["role"],
+            "device_id": device_id,
+            "expires_at": datetime.now(ASIA_KOLKATA) + timedelta(days=REFRESH_TOKEN_TLL_DAYS),
+            "revoked": False,
+            "created_at": datetime.now(ASIA_KOLKATA),
+            "provider": "google",
+            "provider_uid": google_uid,
+        }
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=REFRESH_TOKEN_TLL_DAYS * 24 * 60 * 60,
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=5 * 60,
+        email_verified=True,
+    )
+
 
 # -------------------------------------------------------------------
 # REFRESH TOKEN

@@ -20,3 +20,6 @@ class UserRegisterRequest(UserBase):
     email: EmailStr
     password: str = Field(min_length=8)
     device_id: str = Field(default=None)
+
+class GoogleLoginRequest(BaseModel):
+    google_id_token: str

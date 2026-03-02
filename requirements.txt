@@ -7,3 +7,4 @@ python-jose
 pytz
 pydantic[email]
 aiohttp
+firebase-admin
