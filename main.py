@@ -16,6 +16,8 @@ from core.logging.middleware import RequestLoggingMiddleware
 from core.logging.trace import TraceIDMiddleware
 from core.logging.transport import api_log_worker, audit_log_worker
 
+from core.security.apiKeyMiddleware import ApiKeyMiddleware
+
 load_dotenv()
 
 openAPI_tags = [
@@ -66,6 +68,7 @@ app.add_middleware(
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TraceIDMiddleware)
+app.add_middleware(ApiKeyMiddleware)
 
 registered_routers = [
     auth_router,
