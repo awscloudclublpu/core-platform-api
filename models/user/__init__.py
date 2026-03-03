@@ -1,4 +1,4 @@
-from .base import UserBase
+from .base import UserBase, AuthProvider
 from .responses import UserResponse
 from .db import UserDB
 

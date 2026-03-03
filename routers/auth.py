@@ -13,7 +13,7 @@ from db.collections import refresh_tokens_collection, users_collection
 from models.auth.responses import TokenResponse
 from models.auth.utils import hash_refresh_token, rotate_refresh_token, validate_refresh_session
 from models.auth.requests import LoginRequest, UserRegisterRequest, GoogleLoginRequest
-from models.user import UserDB, UserResponse
+from models.user import UserDB, UserResponse, AuthProvider
 from models.auth.enums import UserRole
 from core.logging.audit import audit_log
 from core.logging.logger import Logger
@@ -41,39 +41,26 @@ ASIA_KOLKATA = pytz.timezone("Asia/Kolkata")
 @auth_router.post("/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    description="""
-    ### Register Flow
-    Register a new user with email and password.
-    Returns the created user details (excluding password).
-    Validations:
-    - Email must be unique.
-    - Password is hashed before storage.
-    """,
 )
 @audit_log(action="USER_REGISTER")
 async def register_user(payload: UserRegisterRequest):
+
     users = users_collection()
 
-    if payload.role != "attendee":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid role",
-        )
+    payload.email = payload.email.lower().strip()
 
-    existing = await users.find_one({"email": payload.email})
-    if existing:
+    if await users.find_one({"email": payload.email}):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=400,
             detail="Email already registered",
         )
-    
-    existing_university_id = await users.find_one({"university_uid": payload.university_uid})
-    if existing_university_id:
+
+    if await users.find_one({"university_uid": payload.university_uid}):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=400,
             detail="University ID already registered",
         )
-    
+
     password_hash = bcrypt.hashpw(
         payload.password.encode(),
         bcrypt.gensalt(),
@@ -85,21 +72,24 @@ async def register_user(payload: UserRegisterRequest):
         id=str(uuid4()),
         **payload.model_dump(exclude={"password"}),
         password_hash=password_hash,
-        is_verified=False,
+
+        role=UserRole.attendee,
+        auth_provider=AuthProvider.local,
+        provider_id=None,
+
+        email_verified=False,
+        schema_version=2,
         created_at=now,
         updated_at=now,
-        device_id=payload.device_id,
     )
 
-    # Store with _id for MongoDB
     user_dict = user.model_dump()
-    user_dict["_id"] = user_dict["id"]
-    del user_dict["id"]
+    user_dict["_id"] = user_dict.pop("id")
+
     await users.insert_one(user_dict)
 
-    return UserResponse(
-        **user.model_dump(exclude={"password_hash"})
-    )
+    return UserResponse(**user.model_dump(exclude={"password_hash"}))
+
 
 # -------------------------------------------------------------------
 # LOGIN
