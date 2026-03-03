@@ -1,37 +1,36 @@
 from datetime import datetime
 from typing import Optional
-from .base import EventBase
-from .enums import EventStatus
+
+from models.event.db import EventContent
+from models.event.base import EventBase
+from models.event.enums import EventStatus, RegistrationMode, EventLevel
+from pydantic import BaseModel
 
 
-class EventResponse(EventBase):
+class EventResponse(BaseModel):
     id: str
-
-    short_description: Optional[str] = None
-    status: EventStatus
+    title: str
+    short_description: Optional[str]
+    banner_url: Optional[str]
 
     start_time: datetime
     end_time: datetime
 
-from datetime import datetime
-from typing import Optional
-from .base import EventBase
-from .enums import EventStatus
+    location: Optional[str]
+    level: EventLevel
+    registration_mode: RegistrationMode
 
+    price: Optional[float]
+    currency: Optional[str]
 
-class EventDetails(EventBase):
+class EventDetails(EventBase, EventContent):
     id: str
-
-    short_description: Optional[str] = None
-    description: Optional[str] = None
-    agenda: Optional[str] = None
-    rules: Optional[str] = None
-    contact_email: Optional[str] = None
 
     status: EventStatus
 
-    created_by: str           # organizer user_id
+    attendance_enabled: bool
+    certificate_enabled: bool
+
     registered_count: int
 
     created_at: datetime
-    updated_at: datetime

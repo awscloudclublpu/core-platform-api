@@ -1,5 +1,4 @@
 from datetime import datetime
-from pydantic import BaseModel
 from typing import Optional
 
 from models.auth.enums import UserRole
@@ -9,8 +8,8 @@ class UserDB(UserBase):
     id: str
     password_hash: str
 
-    role=UserRole.attendee,
-    auth_provider=AuthProvider.local,
+    role: UserRole = UserRole.attendee
+    auth_provider: AuthProvider = AuthProvider.local
     provider_id: Optional[str] = None
 
     email_verified: bool = False
