@@ -5,3 +5,4 @@ class UserRole(str, Enum):
     attendee = "attendee"
     manager = "manager"
     core = "core"
+    mentor = "mentor"

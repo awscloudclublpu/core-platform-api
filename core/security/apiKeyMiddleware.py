@@ -34,4 +34,14 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
                 }
             )
 
+        device_id = request.headers.get("X-DEVICE-ID")
+        if not device_id:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "success": False,
+                    "detail": "Missing Device ID"
+                }
+            )
+
         return await call_next(request)
