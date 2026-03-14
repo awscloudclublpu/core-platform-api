@@ -6,6 +6,8 @@ from starlette.responses import JSONResponse
 
 CLIENT_API_KEY = os.getenv("CLIENT_API_KEY")
 
+if CLIENT_API_KEY is None:
+    raise RuntimeError("CLIENT_API_KEY is not set")
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):
 
